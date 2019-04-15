@@ -1,85 +1,108 @@
 # Graylog content pack for nginx using JSON logging
 
-This is partially based on the [nginx json content pack](https://github.com/petestorey26/graylog-content-pack-nginx-json).
+This is directly based on the Graylog2 [nginx-docker content pack](https://github.com/ronlut/graylog-content-pack-nginx-docker).
 
-It is designed for people using nginx in a docker container, and will only work with nginx version 1.11.8 onwards (you can remove the `escape=json` from the nginx setup if you want to use an earlier version).
+It is designed for people using nginx(1.11.8+) in a docker container.
 
-The advantage of using docker's GELF driver is that you get a LOT of extra information you'll otherwise (e.g. syslog) won't get.
-List of additional metadata fields you're getting when using docker's GELF driver [(source)](https://www.graylog.org/post/centralized-docker-container-logging-with-native-graylog-integration):
- 
- * Hostname – Name of the Docker host
- * Container ID – Full ID of the container
- * Container Name – Human readable name of the container
- * Image ID – ID of the image used to create this container
- * Image Name – Human readable image name
- * Command – Command or entrypoint that is executed inside of the container
- * Tag – A tag that was given on creation time to identify containers easily
- * Creation time – A timestamp when this container was started
- * Log level – Was the message send to STDOUT or STDERR?
- 
-The core advantage of using json is that you can add arbitrary fields to the nginx logging and they will just appear magically in graylog rather than having to delve into complex regex expressions to do things.
+### Content Pack provides
+  * 1 GELF UDP input for both nginx error and access logs, sent from Docker directly, with the following Extractors:
+    * Extract JSON fields from gelf message
+    * Reduce message to path
+    * Lookup Remote Address Geolocation
+    * [Error log] extract fields
+    * [Error log] Reduce error log to message only
+  * 6 streams to sort the log messages
+    * nginx - All requests that were logged into the nginx access_log or nginx_error_log
+    * nginx requests - All requests that were logged into the nginx access_log
+    * nginx errors - All requests that were logged into the nginx error_log
+    * nginx HTTP 404s - All requests that were answered with a HTTP 404 by nginx
+    * nginx HTTP 4XXs - All requests that were answered with a HTTP code in the 400 range by nginx
+    * nginx HTTP 5XXs - All requests that were answered with a HTTP code in the 500 range by nginx
+  * 1 Lookup table for the Geolocation
+    * 1 Data Adapter - configured to use MaxMind city database(see notes below).
+    * 1 Lookup Cache - To provide in-memory caching for the MaxMind lookups
+  * 1 Grok pattern not included in the default pack
+    * IPORHOSTORUNDERSCORE
+  * 1 Dashboard
+    * Displays counts and graph of requests and response codes in the last hour and 24 hours.
+    * Maps the requests based on Geolocation data from MaxMind.
 
-This content pack will create one UDP input for both of nginx's logs (`error_log` and `access_log`). 
+### Design points
 
-Extractors are applied to effectively read the most important data into message fields. 
-You will be able to do searches for all requests of a given remote IP, all requests that were answered with a HTTP 400 or just all requests that were slow.
+  * Docker GELF driver: The advantage of using docker's GELF driver is that you get a LOT of extra information you'll otherwise (e.g. syslog) won't get.
+    * List of additional metadata fields you're getting when using docker's GELF driver [(source)](https://www.graylog.org/post/centralized-docker-container-logging-with-native-graylog-integration):
+      * Hostname – Name of the Docker host
+      * Container ID – Full ID of the container
+      * Container Name – Human readable name of the container
+      * Image ID – ID of the image used to create this container
+      * Image Name – Human readable image name
+      * Command – Command or entrypoint that is executed inside of the container
+      * Tag – A tag that was given on creation time to identify containers easily
+      * Creation time – A timestamp when this container was started
+      * Log level – Was the message send to STDOUT or STDERR?
 
-The pack comes with a default dashboard to build upon and several streams that pre-group your HTTP requests into interesting categories. The additional log information described below (see *Configuring nginx*) will also add timing information to the requests handled by nginx.
-
-See screenshots at the bottom of this page.
+  * JSON log output: The core advantage of using JSON is that you can add arbitrary fields to the nginx logging and they will be mapped in Graylog by the extractor rather than having to delve into complex regex expressions to do things.
 
 ### Configuring nginx
 
-You need to run at least nginx version 1.11.8, escaped JSON support.
+# Note: You need to run at least nginx version 1.11.8 for escaped JSON support.
 
-**Add this to your nginx configuration and restart the service:**
+The following log format can be placed into the http block of the nginx configuration, either by placing it in the /etc/nginx/nginx.conf file or adding it to an included file under /etc/nginx/conf.d/ , before the server block. The access_log and error_log directives can either go in the http block or the server block(best in the http block, so it is global).
 
-    log_format graylog2_json escape=json '{ "timestamp": "$time_iso8601", '
-                 '"remote_addr": "$remote_addr", '
-                 '"body_bytes_sent": $body_bytes_sent, '
-                 '"request_time": $request_time, '
-                 '"response_status": $status, '
-                 '"request": "$request", '
-                 '"request_method": "$request_method", '
-                 '"host": "$host",'
-                 '"upstream_cache_status": "$upstream_cache_status",'
-                 '"upstream_addr": "$upstream_addr",'
-                 '"http_x_forwarded_for": "$http_x_forwarded_for",'
-                 '"http_referrer": "$http_referer", '
-                 '"http_user_agent": "$http_user_agent", '
-                 '"http_version": "$server_protocol", '
-                 '"nginx_access": true }';
-
-    access_log /var/log/nginx/access.log graylog2_json;
-    error_log /var/log/nginx/error.log warn;
+After the format and directives are in place, just reload the nginx configuration with: `nginx -s reload`
 
 This configuration will send various NGINX variables to Graylog. You can log other useful information for each request by adding any other [NGINX variables](http://nginx.org/en/docs/http/ngx_http_core_module.html#variables) into the JSON.
 
+**nginx access log format:**
 
-### Building (your) docker and running it
-**Build**
+  log_format gelf_json escape=json '{ "timestamp": "$time_iso8601", '
+         '"remote_addr": "$remote_addr", '
+         '"connection": "$connection", '
+         '"connection_requests": $connection_requests, '
+         '"pipe": "$pipe", '
+         '"body_bytes_sent": $body_bytes_sent, '
+         '"request_length": $request_length, '
+         '"request_time": $request_time, '
+         '"response_status": $status, '
+         '"request": "$request", '
+         '"request_method": "$request_method", '
+         '"host": "$host", '
+         '"upstream_cache_status": "$upstream_cache_status", '
+         '"upstream_addr": "$upstream_addr", '
+         '"http_x_forwarded_for": "$http_x_forwarded_for", '
+         '"http_referrer": "$http_referer", '
+         '"http_user_agent": "$http_user_agent", '
+         '"http_version": "$server_protocol", '
+         '"remote_user": "$remote_user", '
+         '"http_x_forwarded_proto": "$http_x_forwarded_proto", '
+         '"upstream_response_time": "$upstream_response_time", '
+         '"nginx_access": true }';
 
-I recommend softlinking your log files to stdout/stderr, as done in nginx's [Dockerfile](https://github.com/nginxinc/docker-nginx/blob/8921999083def7ba43a06fabd5f80e4406651353/mainline/jessie/Dockerfile#L21-L23), by adding this directive to your Dockerfile:
+**nginx access_log and error_log directives:**
+  access_log  /var/log/nginx/access.log  gelf_json;
+  error_log  /var/log/nginx/error.log warn;
 
-    # forward request and error logs to docker log collector
-    RUN ln -sf /dev/stdout /var/log/nginx/access.log && ln -sf /dev/stderr /var/log/nginx/error.log
-    
-If you don't want to do that, you can simple change the two settings (`access_log` and `error_log`) to:
+### Docker usage
 
-    access_log /dev/stdout graylog2_json;
-    error_log stderr warn;
+I recommend using the [official nginx image](https://hub.docker.com/_/nginx) or a derivative of it. If you do that, the /var/log/{access,error}.log files should already be linked to the right place. If you build your own, you should check the nginx [Dockerfile](https://github.com/nginxinc/docker-nginx/blob/8921999083def7ba43a06fabd5f80e4406651353/mainline/jessie/Dockerfile#L21-L23) for an example.
 
-**Run**
+**CLI**
 
-Now, when your logs are collected by docker from stdout & stderr, you can run your docker using this command:
+To launch using a docker run command:
 
-    docker run --log-driver=gelf --log-opt gelf-address=udp://<GraylogIP>:12401 <ImageName> <Command>
-    
-for example:
+    docker run -d --name <InstanceName> --log-driver=gelf --log-opt gelf-address=udp://<GraylogIP>:12401 --log-opt tag=<OptionalTag> <ImageName> <OptionalCommand>
 
-    docker run --log-driver=gelf --log-opt gelf-address=udp://<GraylogIP>:12401 busybox echo Hello Graylog
-        
-### Screenshots
-![Screenshots](http://i63.tinypic.com/ohrei8.jpg)
+Examples:
+    docker run --rm --log-driver=gelf --log-opt gelf-address=udp://<GraylogIP>:12401 --log-opt tag=HelloWorld busybox echo Hello Graylog
+    docker run -d --name nginx --log-driver=gelf --log-opt gelf-address=udp://<GraylogIP>:12401 --log-opt tag=prod_frontend -v /path/to/vhost/configs:/etc/nginx/conf.d nginx:latest
 
-![Screenshots](https://s3.amazonaws.com/graylog2public/images/contentpack-nginx-2.png)
+**docker-compose.yml**
+
+    image: nginx:latest
+    volumes:
+      - /path/to/vhost/configs:/etc/nginx/conf.d
+    logging:
+        driver: gelf
+        options:
+            gelf-address: "udp://<GraylogIP>:12401"
+            tag: optional_tag
