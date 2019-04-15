@@ -24,7 +24,7 @@ It is designed for people using nginx(1.11.8+) in a docker container.
   * 1 GELF UDP input for both nginx error and access logs, sent from Docker directly, with the following Extractors:
     * Extract JSON fields from gelf message
     * Reduce message to path
-    * Lookup Remote Address Geolocation
+    * Lookup Remote Address GeoIP Location
     * [Error log] extract fields
     * [Error log] Reduce error log to message only
   * 6 streams to sort the log messages
@@ -34,14 +34,18 @@ It is designed for people using nginx(1.11.8+) in a docker container.
     * nginx HTTP 404s - All requests that were answered with a HTTP 404 by nginx
     * nginx HTTP 4XXs - All requests that were answered with a HTTP code in the 400 range by nginx
     * nginx HTTP 5XXs - All requests that were answered with a HTTP code in the 500 range by nginx
-  * 1 Lookup table for the Geolocation
-    * 1 Data Adapter - configured to use MaxMind city database(see notes below).
-    * 1 Lookup Cache - To provide in-memory caching for the MaxMind lookups
+  * 1 Lookup table for the GeoIP Location
+    * 1 Data Adapter - configured to use MaxMind GeoIP city database(see notes below).
+    * 1 Lookup Cache - To provide in-memory caching for the MaxMind GeoIP lookups
   * 1 Grok pattern not included in the default pack
     * IPORHOSTORUNDERSCORE
   * 1 Dashboard
     * Displays counts and graph of requests and response codes in the last hour and 24 hours.
-    * Maps the requests based on Geolocation data from MaxMind.
+    * Maps the requests based on GeoIP data from MaxMind.
+
+## GeoIP support
+
+For the GeoIP support, you will need to download the MaxMind GeoIP City Database and make it availble to Graylog. The Data Adapter included with the Content Pack sets the path to /usr/local/etc/graylog/GeoLite2-City.mmdb . You can either create and download it there or update the 'Database file path' in for the Data Adapter to the correct path. You can find the download for them here: https://dev.maxmind.com/geoip/geoip2/geolite2/ . It will be the 'GeoLite2 City' MaxMind DB binary file. You will need to extract it and put the .mmdb file into place on the Graylog server.
 
 ## Usage
 ### Configuring nginx
@@ -89,7 +93,7 @@ This configuration will send various NGINX variables to Graylog. You can log oth
 
 ### Docker usage
 
-I recommend using the [official nginx image](https://hub.docker.com/_/nginx) or a derivative of it. If you do that, the /var/log/{access,error}.log files should already be linked to the right place. If you build your own, you should check the nginx [Dockerfile](https://github.com/nginxinc/docker-nginx/blob/8921999083def7ba43a06fabd5f80e4406651353/mainline/jessie/Dockerfile#L21-L23) for an example.
+I recommend using the [official nginx image](https://hub.docker.com/_/nginx) or a derivative of it. If you do that, the /var/log/nginx/{access,error}.log files should already be linked to the right place. If you build your own, you should check the nginx [Dockerfile](https://github.com/nginxinc/docker-nginx/blob/8921999083def7ba43a06fabd5f80e4406651353/mainline/jessie/Dockerfile#L21-L23) for an example.
 
 **CLI**
 
@@ -104,7 +108,7 @@ Examples:
 ```
 
 **docker-compose.yml**
-
+```
     image: nginx:latest
     volumes:
       - /path/to/vhost/configs:/etc/nginx/conf.d
@@ -113,3 +117,4 @@ Examples:
         options:
             gelf-address: "udp://<GraylogIP>:12401"
             tag: optional_tag
+```
