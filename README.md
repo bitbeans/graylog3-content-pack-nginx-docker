@@ -55,6 +55,7 @@ This configuration will send various NGINX variables to Graylog. You can log oth
 
 **nginx access log format:**
 
+```
   log_format gelf_json escape=json '{ "timestamp": "$time_iso8601", '
          '"remote_addr": "$remote_addr", '
          '"connection": "$connection", '
@@ -77,10 +78,13 @@ This configuration will send various NGINX variables to Graylog. You can log oth
          '"http_x_forwarded_proto": "$http_x_forwarded_proto", '
          '"upstream_response_time": "$upstream_response_time", '
          '"nginx_access": true }';
+```
 
 **nginx access_log and error_log directives:**
+```
   access_log  /var/log/nginx/access.log  gelf_json;
   error_log  /var/log/nginx/error.log warn;
+```
 
 ### Docker usage
 
@@ -90,11 +94,11 @@ I recommend using the [official nginx image](https://hub.docker.com/_/nginx) or 
 
 To launch using a docker run command:
 
-    docker run -d --name <InstanceName> --log-driver=gelf --log-opt gelf-address=udp://<GraylogIP>:12401 --log-opt tag=<OptionalTag> <ImageName> <OptionalCommand>
+    `docker run -d --name <InstanceName> --log-driver=gelf --log-opt gelf-address=udp://<GraylogIP>:12401 --log-opt tag=<OptionalTag> <ImageName> <OptionalCommand>`
 
 Examples:
-    docker run --rm --log-driver=gelf --log-opt gelf-address=udp://<GraylogIP>:12401 --log-opt tag=HelloWorld busybox echo Hello Graylog
-    docker run -d --name nginx --log-driver=gelf --log-opt gelf-address=udp://<GraylogIP>:12401 --log-opt tag=prod_frontend -v /path/to/vhost/configs:/etc/nginx/conf.d nginx:latest
+    `docker run --rm --log-driver=gelf --log-opt gelf-address=udp://<GraylogIP>:12401 --log-opt tag=HelloWorld busybox echo Hello Graylog`
+    `docker run -d --name nginx --log-driver=gelf --log-opt gelf-address=udp://<GraylogIP>:12401 --log-opt tag=prod_frontend -v /path/to/vhost/configs:/etc/nginx/conf.d nginx:latest`
 
 **docker-compose.yml**
 
