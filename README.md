@@ -4,7 +4,23 @@ This is directly based on the Graylog2 [nginx-docker content pack](https://githu
 
 It is designed for people using nginx(1.11.8+) in a docker container.
 
-### Content Pack provides
+## Design points
+
+  * Docker GELF driver: The advantage of using docker's GELF driver is that you get a LOT of extra information you'll otherwise (e.g. syslog) won't get.
+    * List of additional metadata fields you're getting when using docker's GELF driver [(source)](https://www.graylog.org/post/centralized-docker-container-logging-with-native-graylog-integration):
+      * Hostname – Name of the Docker host
+      * Container ID – Full ID of the container
+      * Container Name – Human readable name of the container
+      * Image ID – ID of the image used to create this container
+      * Image Name – Human readable image name
+      * Command – Command or entrypoint that is executed inside of the container
+      * Tag – A tag that was given on creation time to identify containers easily
+      * Creation time – A timestamp when this container was started
+      * Log level – Was the message send to STDOUT or STDERR?
+
+  * JSON log output: The core advantage of using JSON is that you can add arbitrary fields to the nginx logging and they will be mapped in Graylog by the extractor rather than having to delve into complex regex expressions to do things.
+
+## Content Pack provides
   * 1 GELF UDP input for both nginx error and access logs, sent from Docker directly, with the following Extractors:
     * Extract JSON fields from gelf message
     * Reduce message to path
@@ -27,25 +43,10 @@ It is designed for people using nginx(1.11.8+) in a docker container.
     * Displays counts and graph of requests and response codes in the last hour and 24 hours.
     * Maps the requests based on Geolocation data from MaxMind.
 
-### Design points
-
-  * Docker GELF driver: The advantage of using docker's GELF driver is that you get a LOT of extra information you'll otherwise (e.g. syslog) won't get.
-    * List of additional metadata fields you're getting when using docker's GELF driver [(source)](https://www.graylog.org/post/centralized-docker-container-logging-with-native-graylog-integration):
-      * Hostname – Name of the Docker host
-      * Container ID – Full ID of the container
-      * Container Name – Human readable name of the container
-      * Image ID – ID of the image used to create this container
-      * Image Name – Human readable image name
-      * Command – Command or entrypoint that is executed inside of the container
-      * Tag – A tag that was given on creation time to identify containers easily
-      * Creation time – A timestamp when this container was started
-      * Log level – Was the message send to STDOUT or STDERR?
-
-  * JSON log output: The core advantage of using JSON is that you can add arbitrary fields to the nginx logging and they will be mapped in Graylog by the extractor rather than having to delve into complex regex expressions to do things.
-
+## Usage
 ### Configuring nginx
 
-# Note: You need to run at least nginx version 1.11.8 for escaped JSON support.
+#### Note: You need to run at least nginx version 1.11.8 for escaped JSON support.
 
 The following log format can be placed into the http block of the nginx configuration, either by placing it in the /etc/nginx/nginx.conf file or adding it to an included file under /etc/nginx/conf.d/ , before the server block. The access_log and error_log directives can either go in the http block or the server block(best in the http block, so it is global).
 
