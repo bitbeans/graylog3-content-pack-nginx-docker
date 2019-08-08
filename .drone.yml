@@ -3,6 +3,6 @@ name: default
 
 steps:
 - name: test
-  image: centos7:latest
+  image: centos:7
   commands:
   - echo "hello"
