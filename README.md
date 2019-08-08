@@ -1,6 +1,6 @@
 # Graylog content pack for nginx using JSON logging
 
-This is directly based on the Graylog2 [nginx-docker content pack](https://github.com/ronlut/graylog-content-pack-nginx-docker).
+This is directly based on the Graylog2 [nginx-docker content pack](https://github.com/ronlut/graylog-content-pack-nginx-docker). 
 
 It is designed for people using nginx(1.11.8+) in a docker container.
 
